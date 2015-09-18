@@ -19,7 +19,12 @@ from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.core.files.base import ContentFile
-from django.contrib.auth.models import User, AnonymousUser
+
+from django.contrib.auth.models import Permission, Group, AnonymousUser
+from django.contrib.auth import get_user_model
+#from django.contrib.auth.models import User, AnonymousUser
+
+
 from django.contrib.sites.models import Site
 from django.contrib.contenttypes.models import ContentType
 from django.template import Context, TemplateDoesNotExist
@@ -444,10 +449,13 @@ class Badge(models.Model):
     nominations_autoapproved = models.BooleanField(default=False, blank=True,
             help_text='Should all nominations be automatically approved?')
 
+    points_end = models.FloatField(default= 0, blank=False, null=False, help_text='points with the badge is awarded')
+
     if taggit:
         tags = TaggableManager(blank=True)
 
-    creator = models.ForeignKey(User, blank=True, null=True)
+    #creator = models.ForeignKey(User, blank=True, null=True)
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True, blank=False)
     modified = models.DateTimeField(auto_now=True, blank=False)
 
@@ -721,8 +729,13 @@ class Award(models.Model):
     claim_code = models.CharField(max_length=32, blank=True,
             default='', unique=False, db_index=True,
             help_text='Code used to claim this award')
-    user = models.ForeignKey(User, related_name="award_user")
-    creator = models.ForeignKey(User, related_name="award_creator",
+    
+    
+    #user = models.ForeignKey(User, related_name="award_user")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="award_user")
+    #creator = models.ForeignKey(User, related_name="award_creator",
+    #                            blank=True, null=True)
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="award_creator",
                                 blank=True, null=True)
     hidden = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True, blank=False)
@@ -917,7 +930,9 @@ class ProgressManager(models.Manager):
 class Progress(models.Model):
     """Record tracking progress toward auto-award of a badge"""
     badge = models.ForeignKey(Badge)
-    user = models.ForeignKey(User, related_name="progress_user")
+    #user = models.ForeignKey(User, related_name="progress_user")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="progress_user")
+
     percent = models.FloatField(default=0)
     counter = models.FloatField(default=0, blank=True, null=True)
     notes = JSONField(blank=True, null=True)
@@ -966,6 +981,12 @@ class Progress(models.Model):
         self.percent = value
         self._quiet_save(raise_exception)
 
+    def update_percent2(self, raise_exception=False):
+        """Update the percent completion value."""
+        value = (float(self.counter) / float(self.badge.points_end)) * 100.0
+        self.percent = value
+        self._quiet_save(raise_exception)
+
     def increment_by(self, amount, raise_exception=False):
         # TODO: Do this with an UPDATE counter+amount in DB
         self.counter += amount
@@ -977,6 +998,10 @@ class Progress(models.Model):
         self.counter -= amount
         self._quiet_save(raise_exception)
         return self
+
+    @property
+    def get_points_end(self):
+        return self.badge.points_end
 
 
 class DeferredAwardManager(models.Manager):
@@ -1036,7 +1061,10 @@ class DeferredAward(models.Model):
             default=make_random_code, unique=True, db_index=True)
     claim_group = models.CharField(max_length=32, blank=True, null=True,
             db_index=True)
-    creator = models.ForeignKey(User, blank=True, null=True)
+    
+      
+    #creator = models.ForeignKey(User, blank=True, null=True)
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True, blank=False)
     modified = models.DateTimeField(auto_now=True, blank=False)
 
@@ -1167,14 +1195,20 @@ class Nomination(models.Model):
     objects = NominationManager()
 
     badge = models.ForeignKey(Badge)
-    nominee = models.ForeignKey(User, related_name="nomination_nominee",
+    
+
+    #nominee = models.ForeignKey(User, related_name="nomination_nominee",
+    nominee = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="nomination_nominee",
             blank=False, null=False)
     accepted = models.BooleanField(default=False)
-    creator = models.ForeignKey(User, related_name="nomination_creator",
+    #creator = models.ForeignKey(User, related_name="nomination_creator",
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="nomination_creator",
             blank=True, null=True)
-    approver = models.ForeignKey(User, related_name="nomination_approver",
+    #approver = models.ForeignKey(User, related_name="nomination_approver",
+    approver = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="nomination_approver",
             blank=True, null=True)
-    rejected_by = models.ForeignKey(User, related_name="nomination_rejected_by",
+    #rejected_by = models.ForeignKey(User, related_name="nomination_rejected_by",
+    rejected_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="nomination_rejected_by",
             blank=True, null=True)
     rejected_reason = models.TextField(blank=True)
     award = models.ForeignKey(Award, null=True, blank=True)

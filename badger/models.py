@@ -449,7 +449,7 @@ class Badge(models.Model):
     nominations_autoapproved = models.BooleanField(default=False, blank=True,
             help_text='Should all nominations be automatically approved?')
 
-    points_end = models.FloatField(default= 0, blank=False, null=False, help_text='points with the badge is awarded')
+    points_end = models.PositiveIntegerField(default= 0, blank=False, null=False, help_text='points with the badge is awarded')
 
     if taggit:
         tags = TaggableManager(blank=True)
